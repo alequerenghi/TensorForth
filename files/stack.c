@@ -23,24 +23,17 @@ tf_stack_t *create_stack(int capacity)
 void destroy_stack(tf_stack_t *s)
 {
 	for (int i = 0; i < s->count; i++) {
-		item_type_t type = s->items[i]->type;
+			item_type_t type = s->items[i].type;
 		switch (type) {
 			case TYPE_TENSOR:
-				destroy_tensor((struct tensor *) s->items[i]->as);
+				destroy_tensor(s->items[i].as.t);
+				break;
+			case TYPE_STRING:
 				break;
 		}
 	}
 	free(s->items);
 	free(s);
-}
-
-int push_tensor(tf_stack_t *s, struct tensor *t)
-{
-	stack_item_t item;
-	item.type = TYPE_TENSOR;
-	item.as.t = t;
-	push_generic(s, item);
-	return 0;
 }
 
 int push_generic(tf_stack_t *s, stack_item_t item)
@@ -59,3 +52,18 @@ int push_generic(tf_stack_t *s, stack_item_t item)
 	return 0;
 }
 
+int push_tensor(tf_stack_t *s, struct tensor *t)
+{
+	stack_item_t item;
+	item.type = TYPE_TENSOR;
+	item.as.t = t;
+	return push_generic(s, item);
+}
+
+int push_string(tf_stack_t *s, char *fn)
+{
+	stack_item_t item;
+	item.type = TYPE_STRING;
+	item.as.filename = fn;
+	return push_generic(s, item);
+}

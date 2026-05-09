@@ -4,6 +4,7 @@
 
 #include "tensor.h"
 #include "stack.h"
+#include "operators.h"
 
 int read_tensor(FILE *fd, float **tensor, int *count)
 {
@@ -74,12 +75,18 @@ int parse_file(char* fn)
 		} else if ('"' == c) {
 			char filename[256];
 			if (fscanf(fd, "%255[^\"]\"", filename) != 1) {
-				printf("Filename too long or not double-quote-terminated");
+				fprintf(stderr, "Filename too long or not double-quote-terminated\n");
 			}
-			printf("Read: %s\n", filename);
+			push_string(s, filename);
 		} else {
-			printf("parse_file: unknown command: %c", c);
-			return 1;
+			operation_t op = get_operation_from_char(c);
+			if (OP_UNKNOWN == op) {
+				fprintf(stderr, "parse_file: unknown command: %c\n", c);
+				break;
+			} else if (0 != execute_operation(s, op)) {
+				fprintf(stderr, "Fatal error at offset %ld. Aborting execution.\n", ftell(fd));
+				break;
+			}
 		}
 	}
 	destroy_stack(s);
