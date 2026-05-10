@@ -52,7 +52,7 @@ int push_generic(tf_stack_t *s, stack_item_t item)
 	return 0;
 }
 
-int push_tensor(tf_stack_t *s, struct tensor *t)
+int push_tensor(tf_stack_t *s, tensor_t *t)
 {
 	stack_item_t item;
 	item.type = TYPE_TENSOR;

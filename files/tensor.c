@@ -3,29 +3,38 @@
 
 #include "tensor.h"
 
-struct tensor *build_tensor_from_memory(float *data, int l)
+tensor_t *build_tensor_from_memory(float *data, int l)
 {
-	struct tensor *t = (struct tensor *)malloc(sizeof(struct tensor));
+	storage_t *s = (storage_t *)malloc(sizeof(storage_t));
+	if (NULL == s) {
+		return NULL;
+	}
+	s->ref_counter = 1;
+	s->on_disk = false;
+	s->data = data;
+	tensor_t *t = (tensor_t *)malloc(sizeof(tensor_t));
 	if (NULL == t) {
 		return NULL;
 	}
-	t->shape[0] = l;
-	t->ndim = 1;
-	t->ref_counter = 1;
-	t->on_disk = false;
-	t->data = data;
+	t->shape[0] = 1;
+	t->shape[1] = l;
+	t->store = s;
 	return t;
 }
 
-int destroy_tensor(struct tensor *t)
+void destroy_tensor(tensor_t *t)
 {
-	if (t->ref_counter > 1) {
-		t->ref_counter--;
-	} else {
-		if (t->on_disk) {
-			free(t->data);
-		}
-		free(t);
+	if (NULL == t) {
+		return;
 	}
-	return 0;
+	storage_t *s = t->store;
+	if (1 < s->ref_counter) {
+		s->ref_counter--;
+	} else {
+		if (!s->on_disk) {
+			free(s->data);
+		}
+		free(s);
+	}
+	free(t);
 }

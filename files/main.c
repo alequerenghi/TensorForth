@@ -65,7 +65,7 @@ int parse_file(char* fn)
 			if (read_tensor(fd, &data, &inserted) != 0) {
 				fclose(fd);
 			} else {
-				struct tensor *t = build_tensor_from_memory(data, inserted);
+				tensor_t *t = build_tensor_from_memory(data, inserted);
 				if (NULL == t) {
 					perror("parse_file: Failed to build tensor from memory");
 					return -2;

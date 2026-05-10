@@ -7,19 +7,22 @@
 
 #define MAX_DIM 2
 
-struct tensor {
-	int shape[MAX_DIM];
-	int ndim;
+typedef struct storage {
 	int ref_counter;
 	off_t 	offset;
 	FILE *fd;
 	bool on_disk;
 	float *data;
-};
+} storage_t;
 
-struct tensor *build_tensor_from_memory(float *data, int l);
+typedef struct tensor {
+	int shape[MAX_DIM];
+	storage_t *store;
+} tensor_t;
 
-int destroy_tensor(struct tensor *t);
+tensor_t *build_tensor_from_memory(float *data, int l);
+
+void destroy_tensor(tensor_t *t);
 
 #endif
 
