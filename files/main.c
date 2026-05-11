@@ -6,6 +6,7 @@
 #include "stack.h"
 #include "operators.h"
 
+// sintassi tensore va corretta
 int read_tensor(FILE *fd, float **tensor, int *count)
 {
 	int capacity = 10;

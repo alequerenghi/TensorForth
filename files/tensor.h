@@ -22,6 +22,10 @@ typedef struct tensor {
 
 tensor_t *build_tensor_from_memory(float *data, int l);
 
+tensor_t *build_empty_tensor(int rows, int columns);
+
+tensor_t *build_zero_tensor(int rows, int columns);
+
 void destroy_tensor(tensor_t *t);
 
 #endif
