@@ -1,5 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <stdint.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 
 #include "tensor.h"
 
@@ -41,7 +47,7 @@ tensor_t *build_empty_tensor(int rows, int columns)
 
 tensor_t *build_zero_tensor(int rows, int columns)
 {
-	float *data = (float *)calloc((rows * columns) * sizeof(float));
+	float *data = (float *)calloc(rows * columns, sizeof(float));
 	if (NULL == data) {
 		return NULL;
 	}
@@ -52,6 +58,71 @@ tensor_t *build_zero_tensor(int rows, int columns)
 	}
 	t->shape[0] = rows;
 	t->shape[1] = columns;
+	return t;
+}
+
+tensor_t *build_on_disk_tensor(char *filename)
+{
+	storage_t *s = (storage_t *)malloc(sizeof(storage_t));
+	if (NULL == s) {
+		perror("build_on_disk_tensor: tensor creation failed");
+		return NULL;
+	}
+	s->on_disk = true;
+	s->ref_counter = 1;
+	tensor_t *t = (tensor_t *)malloc(sizeof(tensor_t));
+	if (NULL == t) {
+		perror("build_on_disk_tensor: tensor creation failed");
+		free(s);
+		return NULL;
+	}
+	s->fd = fopen(filename, "r");
+	if (NULL == s->fd) {
+		perror("build_on_disk_tensor: failed to open file");
+		destroy_tensor(t);
+		return NULL;
+	}
+	// Da finire
+	t->shape[0] = rows;
+	t->shape[1] = cols;
+	t->store = s;
+	return t;
+}
+
+tensor_t *build_from_netpbm(char *filename)
+{
+	FILE *fd = fopen(filename, "r");
+	if (NULL == fd) {
+		perror("build_from_netpbm: failed to open file");
+		return NULL;
+	}
+	int n;
+	int m;
+	if (2 != fscanf(fd, "P5\n%d %d\n255\n", &m, &n)) {
+		fprintf(stderr, "build_from_netpbm: invalid file format\n");
+		fclose(fd);
+		return NULL;
+	}
+	tensor_t *t = build_empty_tensor(n, m);
+	if (NULL == t) {
+		perror("build_from_netpbm: failed to create tensor");
+		fclose(fd);
+		return NULL;
+	}
+	int size = n * m;
+	uint8_t *data_raw = (uint8_t *)malloc(n * m);
+	if ((size_t)size != fread(data_raw, 1, n * m, fd)) {
+		fprintf(stderr, "build_from_netpbm: failed to read pixel data\n");
+		free(data_raw);
+		destroy_tensor(t);
+		fclose(fd);
+		return NULL;
+	}
+	for (int i = 0; i < size; i++) {
+		t->store->data[i] = (float)data_raw[i] / 255.0f;
+	}
+	free(data_raw);
+	fclose(fd);
 	return t;
 }
 

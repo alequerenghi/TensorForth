@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O1 -Wall -pedantic -std=c18 -g
+CFLAGS = -O1 -Wall -pedantic -std=gnu18 -g
 LIB = lib
 CHEADERS = ${wildcard *.}
 PROGNAME = tensorforth
@@ -12,7 +12,7 @@ ${PROGNAME}: main.o ${LIB}/libtensorfort.a
 ${LIB}:
 	mkdir -p $@
 
-${LIB}/libtensorfort.a: tensor.o stack.o operators.o
+${LIB}/libtensorfort.a: tensor.o stack.o operators.o matrix_multiply.o netpbm.o
 	ar rs $@ $^
 
 main.o: main.c ${CHEADERS}

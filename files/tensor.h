@@ -26,6 +26,10 @@ tensor_t *build_empty_tensor(int rows, int columns);
 
 tensor_t *build_zero_tensor(int rows, int columns);
 
+tensor_t *build_from_netpbm(char *filename);
+
+tensor_t *build_from_tensor_image(char *filename);
+
 void destroy_tensor(tensor_t *t);
 
 #endif
