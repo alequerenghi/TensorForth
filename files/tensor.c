@@ -61,7 +61,7 @@ tensor_t *build_zero_tensor(int rows, int columns)
 	return t;
 }
 
-tensor_t *build_on_disk_tensor(char *filename)
+tensor_t *build_on_disk_tensor(const char *filename)
 {
 	storage_t *s = (storage_t *)malloc(sizeof(storage_t));
 	if (NULL == s) {
@@ -76,20 +76,38 @@ tensor_t *build_on_disk_tensor(char *filename)
 		free(s);
 		return NULL;
 	}
-	s->fd = fopen(filename, "r");
-	if (NULL == s->fd) {
+	t->store = s;
+	FILE *fd = fopen(filename, "r");
+	if (NULL == fd) {
 		perror("build_on_disk_tensor: failed to open file");
 		destroy_tensor(t);
 		return NULL;
 	}
-	// Da finire
-	t->shape[0] = rows;
-	t->shape[1] = cols;
-	t->store = s;
+	struct stat sbuf;
+	if (0 != fstat(fileno(fd), &sbuf)) {
+		perror("build_on_disk_tensor: failed to read file info");
+		destroy_tensor(t);
+		fclose(fd);
+		return NULL;
+	}
+	void *map = mmap((void *)0, sbuf.st_size, PROT_READ, MAP_SHARED, fileno(fd), 0);
+	if (MAP_FAILED == map) {
+		perror("build_tensor_from_memory: failed to mmap data");
+		destroy_tensor(t);
+		fclose(fd);
+		return NULL;
+	}
+	struct on_disk_tensor *header = (struct on_disk_tensor*)map;
+	s->data = (float *)((char *)map + header->offset);
+	s->offset = header->offset;
+	s->mmap_size = sbuf.st_size;
+	t->shape[0] = header->shape[0];
+	t->shape[1] = header->shape[1];
+	fclose(fd);
 	return t;
 }
 
-tensor_t *build_from_netpbm(char *filename)
+tensor_t *build_from_netpbm(const char *filename)
 {
 	FILE *fd = fopen(filename, "r");
 	if (NULL == fd) {
@@ -197,6 +215,9 @@ void destroy_tensor(tensor_t *t)
 	} else {
 		if (!s->on_disk) {
 			free(s->data);
+		} else {
+			void *map = (char *)s->data - s->offset;
+			munmap(map, s->mmap_size);
 		}
 		free(s);
 	}

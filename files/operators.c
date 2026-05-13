@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdint.h>
 
 #include "stack.h"
 #include "tensor.h"
@@ -76,7 +77,11 @@ operation_t get_operation_from_char(char c)
 		case '@': return OP_MATMUL;
 		case '.': return OP_DOT;
 		case 'c': return OP_CONV;
-
+		// FILES
+		case '(': return LOAD_PGM;
+		case '{': return LOAD_TENSOR;
+		case ')': return WRITE_PGM;
+		case '}': return WRITE_TENSOR;
 		default: return OP_UNKNOWN;
 	}
 }
@@ -619,6 +624,75 @@ int convolute_tensors(tf_stack_t *s)
 	return 0;
 }
 
+int load_from_file(tf_stack_t *s, const char *func_name, tensor_t * (*func)(const char *))
+{
+	if (1 > s->count) {
+		fprintf(stderr, "load_pgm: the stack doesn't contain enough arguments\n");
+		return -1;
+	}
+	if (TYPE_STRING != s->items[s->count - 1].type) {
+		fprintf(stderr, "load_pgm: filename required\n");
+		return -2;
+	}
+	char *filename = s->items[s->count - 1].as.filename;
+	tensor_t *t = func(filename);
+	if (NULL == t) {
+		return -3;
+	}
+	s->count--;
+	if (0 != push_tensor(s, t)) {
+		fprintf(stderr, "load_pgm: failed to push tensor on stack\n");
+		destroy_tensor(t);
+		return -4;
+	}
+	return 0;
+}
+
+int save_to_file(tf_stack_t *s, const char * func_name, int (*func)(FILE *, tensor_t *))
+{
+	if (2 > s->count) {
+		fprintf(stderr, "%s: stack requires at least 2 elements\n", func_name);
+		return -1;
+	}
+	if (TYPE_STRING != s->items[s->count - 1].type ||
+			TYPE_TENSOR != s->items[s->count - 2].type) {
+		fprintf(stderr, "%s: stack requires one tensor and one filename\n", func_name);
+		return -2;
+	}
+	const char *filename = s->items[s->count - 1].as.filename;
+	tensor_t *t = s->items[s->count - 2].as.t;
+	FILE *fd = fopen(filename, "wb");
+	if (NULL == fd) {
+		perror("save_to_file: failed to open file");
+		return -3;
+	}
+	if (0 != func(fd, t)) {
+		fprintf(stderr, "%s: failed to write to file\n", func_name);
+		return -4;
+	}
+	s->count--;
+	drop_tensor(s);
+	return 0;
+}
+
+int write_pgm(FILE *fd, tensor_t *t)
+{
+	if (0 > fprintf(fd, "P5\n%d %d\n255\n", t->shape[1], t->shape[0])) {
+		perror("write_pgm: failed to write header");
+		return -1;
+	}
+	int size = t->shape[0] * t->shape[1];
+	uint8_t *data = (uint8_t *)malloc(size);
+	for (int i = 0; i < size; i ++) {
+		data[i] = (uint8_t)(((0 < t->store->data[i]) * t->store->data[i] - ((1 > t->store->data[i]) * t->store->data[i] - 1)) * 255);
+	}
+	if (size != fwrite(data, 1, size, fd)) {
+		fprintf(stderr, "write_pgm: failed to write data\n");
+		return -2;
+	}
+	return 0;
+}
+
 int execute_operation(tf_stack_t *s, operation_t op)
 {
 	switch (op) {
@@ -658,6 +732,11 @@ int execute_operation(tf_stack_t *s, operation_t op)
 		case OP_MATMUL:			return matmul(s);
 		case OP_DOT:				return dot(s);
 		case OP_CONV:				return convolute_tensors(s);
+		// FILES
+		case LOAD_PGM:			return load_from_file(s, "load_pgm", build_from_netpbm);
+		case LOAD_TENSOR:		return load_from_file(s, "load_tensor", build_on_disk_tensor);
+		case WRITE_PGM:			return save_to_file(s, "write_pgm", write_pgm);
+		case WRITE_TENSOR:	return save_to_file(s, "write_tensor", write_tensor);
 
 		case OP_UNKNOWN:
 			fprintf(stderr, "execute_operation: unknown command\n");

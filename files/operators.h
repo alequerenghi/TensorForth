@@ -40,6 +40,11 @@ typedef enum {
 	OP_MATMUL,
 	OP_DOT,
 	OP_CONV,
+	// FILES
+	LOAD_PGM,
+	LOAD_TENSOR,
+	WRITE_PGM,
+	WRITE_TENSOR,
 
 	OP_UNKNOWN
 } operation_t;

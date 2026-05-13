@@ -5,8 +5,7 @@
 
 typedef enum {
 	TYPE_STRING,
-	TYPE_TENSOR//,
-	// TYPE_OP
+	TYPE_TENSOR
 } item_type_t;
 
 typedef struct {
@@ -14,7 +13,6 @@ typedef struct {
 	union {
 		char *filename;
 		tensor_t *t;
-		//enum *operator
 	} as;
 } stack_item_t;
 
