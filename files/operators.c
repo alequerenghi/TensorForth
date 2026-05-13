@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "stack.h"
 #include "tensor.h"
@@ -82,6 +83,7 @@ operation_t get_operation_from_char(char c)
 		case '{': return LOAD_TENSOR;
 		case ')': return WRITE_PGM;
 		case '}': return WRITE_TENSOR;
+
 		default: return OP_UNKNOWN;
 	}
 }
@@ -668,6 +670,7 @@ int save_to_file(tf_stack_t *s, const char * func_name, int (*func)(FILE *, tens
 	}
 	if (0 != func(fd, t)) {
 		fprintf(stderr, "%s: failed to write to file\n", func_name);
+		fclose(fd);
 		return -4;
 	}
 	s->count--;
@@ -690,6 +693,31 @@ int write_pgm(FILE *fd, tensor_t *t)
 		fprintf(stderr, "write_pgm: failed to write data\n");
 		return -2;
 	}
+	fclose(fd);
+	return 0;
+}
+
+int write_tensor(FILE *fd, tensor_t *t)
+{
+	struct on_disk_tensor header;
+	memset(&header, 0, sizeof(header));
+	header.shape[0] = t->shape[0];
+	header.shape[1] = t->shape[1];
+	header.dim = 1 == header.shape[0] ? 1 : 2;
+	header.offset = 64;
+	size_t header_size = sizeof(struct on_disk_tensor);
+	fwrite(&header, header_size, 1, fd);
+	if (header.offset > header_size) {
+		int padding = header.offset - header_size;
+		char pad[64] = {0};
+		fwrite(pad, 1, padding, fd);
+	}
+	size_t size = (size_t)(t->shape[0] * t->shape[1]);
+	if (size != fwrite(t->store->data, sizeof(float), size, fd)) {
+		fprintf(stderr, "write_tensor: failed to write data\n");
+		return -1;
+	}
+	fclose(fd);
 	return 0;
 }
 
