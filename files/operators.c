@@ -26,13 +26,20 @@ int require_tensors(tf_stack_t *s, int count, char *func_name)
 
 int verify_shape_tensor(tensor_t *shape, char *func_name)
 {
-	if (1 != shape->shape[0] || 2 != shape->shape[1]) {
-		fprintf(stderr, "%s: shape tensors have shape [ 1 2 ]\n", func_name);
+	if (1 != shape->shape[0] || 2 < shape->shape[1]) {
+		fprintf(stderr, "%s: shape tensors have shape either [ 1 1 ] or [ 1 2 ], this tensor: [%d %d]\n", func_name, shape->shape[0], shape->shape[1]);
 		return -1;
 	}
-	if (1 > (shape->store->data[0] * shape->store->data[1])) {
-		fprintf(stderr, "%s: each dimension should be >= 1\n", func_name);
-		return -2;
+	int size = shape->shape[0] * shape->shape[1];
+	for (int i = 0; i < size; i++) {
+		if (0 > shape->store->data[i]) {
+			fprintf(stderr, "%s: shape data should be positive\n", func_name);
+			return -2;
+		}
+	}
+	if (1 > size) {
+		fprintf(stderr, "%s: each dimension should be at least >= 1\n", func_name);
+		return -3;
 	}
 	return 0;
 }
@@ -181,7 +188,7 @@ int fill_tensor(tf_stack_t *s)
 	}
 	tensor_t *fill = s->items[s->count - 1].as.t;
 	tensor_t *shape = s->items[s->count - 2].as.t;
-	int data_size = (int)(shape->store->data[0] * shape->store->data[1]);
+	int data_size = (int)(shape->store->data[0] * (2 == shape->shape[1] ? shape->store->data[1] : 1));
 	int fill_size = fill->shape[0] * fill->shape[1];
 	if (0 != verify_shape_tensor(shape, "fill_tensor")) {
 		return -2;
@@ -222,14 +229,14 @@ int fill_random(tf_stack_t *s)
 	if (0 != verify_shape_tensor(shape, "fill_random")) {
 		return -2;
 	}
-	int data_size = (int)(shape->store->data[0] * shape->store->data[1]);
+	int data_size = (int)(shape->store->data[0] * (2 == shape->shape[1] ? shape->store->data[1] : 1));
 	float *data = (float *)malloc(data_size * sizeof(float));
 	if (NULL == data) {
 		perror("fill_random: memory allocation error");
 		return -3;
 	}
 	for (int i = 0; i < data_size; i++) {
-		data[i] = (float)(rand() / RAND_MAX);
+		data[i] = (float)rand() / RAND_MAX;
 	}
 	tensor_t *t = build_tensor_from_memory(data, data_size);
 	if (NULL == t) {
@@ -256,7 +263,7 @@ int reshape_tensor(tf_stack_t *s)
 	if (0 != verify_shape_tensor(shape, "reshape_tensor")) {
 		return -2;
 	}
-	int new_size = (int)(shape->store->data[0] * shape->store->data[1]);
+	int new_size = (int)shape->store->data[0] * (int)(2 == shape->shape[1] ? shape->store->data[1] : 1);
 	int old_size = target->shape[0] * target->shape[1];
 	if (old_size != new_size) {
 		fprintf(stderr, "reshape_tensor: new size doesn't match old size\n");
@@ -267,8 +274,8 @@ int reshape_tensor(tf_stack_t *s)
 		perror("reshape_tensor: memory allocation error");
 		return -4;
 	}
-	t->shape[1] = (int)shape->store->data[1];
-	t->shape[0] = (int)shape->store->data[0];
+	t->shape[1] = (int)shape->store->data[1 == shape->shape[1] ? 0 : 1];
+	t->shape[0] = 1 == shape->shape[1] ? 1 : (int)shape->store->data[0];
 	t->store = target->store;
 	t->store->ref_counter++;
 	drop_tensor(s);
@@ -673,6 +680,7 @@ int save_to_file(tf_stack_t *s, const char * func_name, int (*func)(FILE *, tens
 		fclose(fd);
 		return -4;
 	}
+	fclose(fd);
 	s->count--;
 	drop_tensor(s);
 	return 0;
@@ -686,14 +694,19 @@ int write_pgm(FILE *fd, tensor_t *t)
 	}
 	int size = t->shape[0] * t->shape[1];
 	uint8_t *data = (uint8_t *)malloc(size);
+	if (NULL == data) {
+		perror("write_pgm: memory allocation failed");
+		return -2;
+	}
 	for (int i = 0; i < size; i ++) {
-		data[i] = (uint8_t)(((0 < t->store->data[i]) * t->store->data[i] - ((1 > t->store->data[i]) * t->store->data[i] - 1)) * 255);
+		data[i] = (uint8_t)(((0 < t->store->data[i]) * t->store->data[i] - ((1 < t->store->data[i]) * (t->store->data[i] - 1))) * 255);
 	}
 	if (size != fwrite(data, 1, size, fd)) {
 		fprintf(stderr, "write_pgm: failed to write data\n");
+		free(data);
 		return -2;
 	}
-	fclose(fd);
+	free(data);
 	return 0;
 }
 
@@ -717,7 +730,6 @@ int write_tensor(FILE *fd, tensor_t *t)
 		fprintf(stderr, "write_tensor: failed to write data\n");
 		return -1;
 	}
-	fclose(fd);
 	return 0;
 }
 

@@ -12,7 +12,7 @@ ${PROGNAME}: main.o ${LIB}/libtensorfort.a
 ${LIB}:
 	mkdir -p $@
 
-${LIB}/libtensorfort.a: tensor.o stack.o operators.o matrix_multiply.o netpbm.o
+${LIB}/libtensorfort.a: tensor.o stack.o operators.o matrix_multiply.o
 	ar rs $@ $^
 
 main.o: main.c ${CHEADERS}

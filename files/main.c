@@ -12,7 +12,11 @@ int read_tensor(FILE *fd, float **tensor, int *count)
 	int capacity = 10;
 	int inserted = 0;
 	float *arr = (float *)malloc(capacity * sizeof(float));
-	int c;
+	int c = fgetc(fd);
+	if (!isspace(c)) {
+		fprintf(stderr, "read_tensor: Error in tensor format\n");
+		return -1;
+	}
 	while ((c = fgetc(fd)) != EOF) {
 		while (isspace(c)) {
 			c = fgetc(fd);	
@@ -28,6 +32,11 @@ int read_tensor(FILE *fd, float **tensor, int *count)
 			printf("read_tensor: Erorr in tensor format");
 			free(arr);
 			return -2;
+		}
+		c = fgetc(fd);
+		if (!isspace(c)) {
+			fprintf(stderr, "read_tensor: Error in tensor format\n");
+			return -3;
 		}
 		if (capacity > inserted) {
 			arr[inserted++] = val;
@@ -52,7 +61,7 @@ int parse_file(char* fn)
 {
 	FILE *fd = fopen(fn, "r+");
 	if (NULL == fd) {
-		printf("parse_file: Cannot open file %s", fn);
+		fprintf(stderr, "parse_file: Cannot open file %s", fn);
 		return -1;
 	}
 	tf_stack_t *s = create_stack(20);
@@ -63,33 +72,50 @@ int parse_file(char* fn)
 		} else if ('[' == c) {
 			float *data = NULL;
 			int inserted  = 0;
-			if (read_tensor(fd, &data, &inserted) != 0) {
+			if (0 != read_tensor(fd, &data, &inserted)) {
 				fclose(fd);
-			} else {
-				tensor_t *t = build_tensor_from_memory(data, inserted);
-				if (NULL == t) {
-					perror("parse_file: Failed to build tensor from memory");
-					return -2;
-				}
-				push_tensor(s, t);
+				destroy_stack(s);
+				return -2;
 			}
+			tensor_t *t = build_tensor_from_memory(data, inserted);
+			if (NULL == t) {
+				perror("parse_file: Failed to build tensor from memory");
+				fclose(fd);
+				destroy_stack(s);
+				return -3;
+			}
+			push_tensor(s, t);
 		} else if ('"' == c) {
 			char filename[256];
 			if (fscanf(fd, "%255[^\"]\"", filename) != 1) {
 				fprintf(stderr, "Filename too long or not double-quote-terminated\n");
+				fclose(fd);
+				destroy_stack(s);
+				return -4;
 			}
 			push_string(s, filename);
 		} else {
 			operation_t op = get_operation_from_char(c);
 			if (OP_UNKNOWN == op) {
 				fprintf(stderr, "parse_file: unknown command: %c\n", c);
-				break;
-			} else if (0 != execute_operation(s, op)) {
+				fclose(fd);
+				destroy_stack(s);
+				return -5;
+			}
+			if (0 != execute_operation(s, op)) {
 				fprintf(stderr, "Fatal error at offset %ld. Aborting execution.\n", ftell(fd));
 				break;
 			}
 		}
+		c = fgetc(fd);
+		if (EOF != c && !isspace(c)) {
+			fprintf(stderr, "parse_file: Syntax error at offset %ld. Tokens must be whitepsace-separated\n", ftell(fd) - 1);
+			fclose(fd);
+			destroy_stack(s);
+			return -6;
+		}
 	}
+	fclose(fd);
 	destroy_stack(s);
 	return 0;
 }
