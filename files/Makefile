@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O1 -Wall -pedantic -std=gnu18 -g
+CFLAGS = -O3 -march=native -Wall -pedantic -std=gnu18
 LIB = lib
 CHEADERS = ${wildcard *.}
 PROGNAME = tensorforth

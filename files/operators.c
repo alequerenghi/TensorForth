@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #include "stack.h"
 #include "tensor.h"
@@ -96,6 +97,8 @@ operation_t get_operation_from_char(char c)
 		case '<': return OP_LT;
 		case '>': return OP_GT;
 		case '=': return OP_EQ;
+
+		case '$': return OP_TERNARY;
 
 		case '&': return OP_AND;
 		case '|': return OP_OR;
@@ -320,7 +323,7 @@ int fill_random(tf_stack_t *s)
 	}
 	for (int i = 0; i < data_size; i++) {
 		// maybe use rand_r or something else for parallel filling
-		data[i] = (float)rand() / RAND_MAX;
+		data[i] = (float)drand48();
 	}
 	tensor_t *t = build_empty_tensor(n, m);
 	if (NULL == t) {
@@ -609,7 +612,6 @@ int negate_floats(tf_stack_t *s)
  * @param[in,out] s The pointer to the stack
  * @return 0 if the operation is successful or a negative integer otherwise
  */
-// see if branchless is better than branched
 int get_relu(tf_stack_t *s)
 {
 	if (0 != require_tensors(s, 1, "get_relu")) {
@@ -633,7 +635,6 @@ int get_relu(tf_stack_t *s)
 	return 0;
 }
 
-// check this branchless
 void get_min(float *res, const float *left, const float *right, int size)
 {
 	for (int i = 0; i < size; i++) {
@@ -641,7 +642,6 @@ void get_min(float *res, const float *left, const float *right, int size)
 	}
 }
 
-// check this branchless
 void get_max(float *res, const float *left, const float *right, int size)
 {
 	for (int i = 0; i < size; i++) {
