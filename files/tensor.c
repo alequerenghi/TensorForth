@@ -9,25 +9,13 @@
 
 #include "tensor.h"
 
-tensor_t *build_tensor_from_memory(float *data, int l)
-{
-	storage_t *s = (storage_t *)malloc(sizeof(storage_t));
-	if (NULL == s) {
-		return NULL;
-	}
-	s->ref_counter = 1;
-	s->on_disk = false;
-	s->data = data;
-	tensor_t *t = (tensor_t *)malloc(sizeof(tensor_t));
-	if (NULL == t) {
-		free(s);
-		return NULL;
-	}
-	t->shape[0] = 1;
-	t->shape[1] = l;
-	t->store = s;
-	return t;
-}
+/**
+ * @file: tensor.c
+ * @author: ALESSANDRO QUERENGHI
+ *
+ * This files contains the implementation of the header functions specified in
+ * tensor.h
+ */
 
 tensor_t *build_empty_tensor(int rows, int columns)
 {
@@ -35,11 +23,23 @@ tensor_t *build_empty_tensor(int rows, int columns)
 	if (NULL == data) {
 		return NULL;
 	}
-	tensor_t *t = build_tensor_from_memory(data, rows * columns);
-	if (NULL == t) {
+	storage_t *s = (storage_t *)malloc(sizeof(storage_t));
+	if (NULL == s) {
+		perror("build_empty_tensor: failed to allocate memory");
 		free(data);
 		return NULL;
 	}
+	tensor_t *t = (tensor_t *)malloc(sizeof(tensor_t));
+	if (NULL == t) {
+		perror("build_empty_tensor: failed to create tensor");
+		free(s);
+		free(data);
+		return NULL;
+	}
+	s->data = data;
+	s->on_disk = false;
+	s->ref_counter = 1;
+	t->store = s;
 	t->shape[0] = rows;
 	t->shape[1] = columns;
 	return t;
@@ -47,15 +47,28 @@ tensor_t *build_empty_tensor(int rows, int columns)
 
 tensor_t *build_zero_tensor(int rows, int columns)
 {
+	// allocates memory and fills it with 0s
 	float *data = (float *)calloc(rows * columns, sizeof(float));
 	if (NULL == data) {
 		return NULL;
 	}
-	tensor_t *t = build_tensor_from_memory(data, rows * columns);
-	if (NULL == t) {
+	storage_t *s = (storage_t *)malloc(sizeof(storage_t));
+	if (NULL == s) {
+		perror("build_zero_tensor: failed to allocate memory");
 		free(data);
 		return NULL;
 	}
+	tensor_t *t = (tensor_t *)malloc(sizeof(tensor_t));
+	if (NULL == t) {
+		perror("build_zero_tensor: failed to create tensor");
+		free(s);
+		free(data);
+		return NULL;
+	}
+	s->data = data;
+	s->on_disk = false;
+	s->ref_counter = 1;
+	t->store = s;
 	t->shape[0] = rows;
 	t->shape[1] = columns;
 	return t;
@@ -63,26 +76,26 @@ tensor_t *build_zero_tensor(int rows, int columns)
 
 tensor_t *build_on_disk_tensor(const char *filename)
 {
+	// create storage and tensor structs
 	storage_t *s = (storage_t *)malloc(sizeof(storage_t));
 	if (NULL == s) {
 		perror("build_on_disk_tensor: tensor creation failed");
 		return NULL;
 	}
-	s->on_disk = true;
-	s->ref_counter = 1;
 	tensor_t *t = (tensor_t *)malloc(sizeof(tensor_t));
 	if (NULL == t) {
 		perror("build_on_disk_tensor: tensor creation failed");
 		free(s);
 		return NULL;
 	}
-	t->store = s;
+	// open file
 	FILE *fd = fopen(filename, "r");
 	if (NULL == fd) {
 		perror("build_on_disk_tensor: failed to open file");
 		destroy_tensor(t);
 		return NULL;
 	}
+	// read file info
 	struct stat sbuf;
 	if (0 != fstat(fileno(fd), &sbuf)) {
 		perror("build_on_disk_tensor: failed to read file info");
@@ -90,32 +103,41 @@ tensor_t *build_on_disk_tensor(const char *filename)
 		fclose(fd);
 		return NULL;
 	}
+	// map memory to file
 	void *map = mmap((void *)0, sbuf.st_size, PROT_READ, MAP_SHARED, fileno(fd), 0);
 	if (MAP_FAILED == map) {
-		perror("build_tensor_from_memory: failed to mmap data");
+		perror("build_on_disk_tensor: failed to mmap data");
 		destroy_tensor(t);
 		fclose(fd);
 		return NULL;
 	}
+	// cast mmap-ped memory to on_disk_tensor to read automatically the parameters
 	struct on_disk_tensor *header = (struct on_disk_tensor*)map;
-	s->data = (float *)((char *)map + header->offset);
-	s->offset = header->offset;
-	s->mmap_size = sbuf.st_size;
+	// initialize tensor fields
 	t->shape[0] = header->shape[0];
 	t->shape[1] = header->shape[1];
+	t->store = s;
+	s->on_disk = true;
+	s->ref_counter = 1;
+	// point data to file region mapped with mmap, add offset to skip header (so
+	// it isn't necessary later) and cast to float
+	s->data = (float *)((char *)map + header->offset);
+	s->offset = header->offset;
+	// save for munmap
+	s->mmap_size = sbuf.st_size;
 	fclose(fd);
 	return t;
 }
 
 tensor_t *build_from_netpbm(const char *filename)
 {
-	FILE *fd = fopen(filename, "r");
+	FILE *fd = fopen(filename, "rb");
 	if (NULL == fd) {
 		perror("build_from_netpbm: failed to open file");
 		return NULL;
 	}
-	int n;
-	int m;
+	// read header and make sure this is actually a pgm file
+	int n, m;
 	if (2 != fscanf(fd, "P5\n%d %d\n255\n", &m, &n)) {
 		fprintf(stderr, "build_from_netpbm: invalid file format\n");
 		fclose(fd);
@@ -128,14 +150,21 @@ tensor_t *build_from_netpbm(const char *filename)
 		return NULL;
 	}
 	int size = n * m;
-	uint8_t *data_raw = (uint8_t *)malloc(n * m);
-	if ((size_t)size != fread(data_raw, 1, n * m, fd)) {
+	uint8_t *data_raw = (uint8_t *)malloc(size);
+	if (NULL == data_raw) {
+		perror("build_from_netpbm: failed to allocate memory");
+		destroy_tensor(t);
+		fclose(fd);
+	}
+	if ((size_t)size != fread(data_raw, 1, size, fd)) {
 		fprintf(stderr, "build_from_netpbm: failed to read pixel data\n");
 		free(data_raw);
 		destroy_tensor(t);
 		fclose(fd);
 		return NULL;
 	}
+	// fills data array with pixel data, converts bytes to float by casting and
+	// dividing by 255
 	for (int i = 0; i < size; i++) {
 		t->store->data[i] = (float)data_raw[i] / 255.0f;
 	}
@@ -144,78 +173,22 @@ tensor_t *build_from_netpbm(const char *filename)
 	return t;
 }
 
-// tensor_t *build_empty_mmap_tensor(int rows, int columns, const char *filepath)
-// {
-//     size_t num_elements = (size_t)rows * columns;
-//     size_t byte_size = num_elements * sizeof(float);
-// 
-//     // 1. Open a new file (Create it if missing, truncate it if it exists)
-//     int fd = open(filepath, O_RDWR | O_CREAT | O_TRUNC, 0666);
-//     if (fd == -1) {
-//         perror("build_mmap_tensor: failed to open file");
-//         return NULL;
-//     }
-// 
-//     // 2. MAGIC STEP: Stretch the file to the exact size we need!
-//     if (ftruncate(fd, byte_size) == -1) {
-//         perror("build_mmap_tensor: ftruncate failed");
-//         close(fd);
-//         return NULL;
-//     }
-// 
-//     // 3. Map the stretched file into memory
-//     float *data = (float *)mmap(NULL, byte_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-//     if (data == MAP_FAILED) {
-//         perror("build_mmap_tensor: mmap failed");
-//         close(fd);
-//         return NULL;
-//     }
-// 
-//     // 4. Manually construct the Storage struct for disk tracking
-//     storage_t *store = (storage_t *)malloc(sizeof(storage_t));
-//     if (store == NULL) {
-//         munmap(data, byte_size);
-//         close(fd);
-//         return NULL;
-//     }
-//     
-//     store->data = data;
-//     store->size = num_elements;
-//     store->ref_counter = 1;
-//     
-//     // Set the mmap-specific tracking variables so destroy_tensor works!
-//     store->on_disk = true;
-//     store->fd = fd;
-//     store->mmap_size = byte_size;
-// 
-//     // 5. Construct the View (Tensor) struct
-//     tensor_t *t = (tensor_t *)malloc(sizeof(tensor_t));
-//     if (t == NULL) {
-//         free(store);
-//         munmap(data, byte_size);
-//         close(fd);
-//         return NULL;
-//     }
-//     
-//     t->shape[0] = rows;
-//     t->shape[1] = columns;
-//     t->store = store;
-// 
-//     return t;
-// }
-
 void destroy_tensor(tensor_t *t)
 {
+	// nothing to do
 	if (NULL == t) {
 		return;
 	}
 	storage_t *s = t->store;
+	// if there are still copies of this tensor just decrement the ref_counter
 	if (1 < s->ref_counter) {
 		s->ref_counter--;
 	} else {
 		if (!s->on_disk) {
+			// tensor is in-memory
 			free(s->data);
 		} else {
+			// tensor is on disk
 			void *map = (char *)s->data - s->offset;
 			munmap(map, s->mmap_size);
 		}

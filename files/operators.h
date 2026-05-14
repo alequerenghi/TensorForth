@@ -3,6 +3,18 @@
 
 #include "stack.h"
 
+/**
+ * @file:		operators.h
+ * @author: ALESSANDRO QUERENGHI
+ * @id:			IN2300001
+ *
+ * This file contains the enumerations that define the operations allowed and
+ * the signatures of the functions that are implemented
+ */
+
+/**
+ * This enumeration represents all the available operations in TensorForth
+ */
 typedef enum {
 	// UTILITY
 	OP_PRINT,
@@ -27,6 +39,8 @@ typedef enum {
 	OP_GT,
 	OP_EQ,
 
+	OP_TERNARY,
+
 	OP_AND,
 	OP_OR,
 	OP_NOT,
@@ -49,10 +63,31 @@ typedef enum {
 	OP_UNKNOWN
 } operation_t;
 
+/**
+ * Function pointer for operators that make use of three float elements of the
+ * same size
+ *
+ * @param[in] math_op Pointer to the function to be used
+ */
 typedef void (*math_op)(float *res, const float *left, const float *right, int size);
 
+/**
+ * Function to map a character to the operation enum defined before
+ *
+ * @param[in] c The character
+ * @return The corresponding operation or OP_UNKNOWN if no operation is defined
+ * for that character
+ */
 operation_t get_operation_from_char(char c);
 
+/**
+ * Executes the operation on the stack by popping the required elements and
+ * pushing the result (if any) onto the stack
+ *
+ * @param[in,out] s The pointer to the stack
+ * @parm[in] op The operation to perform
+ * @return 0 if success or a negative number if the operation failed
+ */
 int execute_operation(tf_stack_t *s, operation_t op);
 
 #endif
