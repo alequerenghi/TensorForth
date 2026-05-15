@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <omp.h>
 
 #include "tensor.h"
 
@@ -163,6 +164,7 @@ tensor_t *build_from_netpbm(const char *filename)
 		fclose(fd);
 		return NULL;
 	}
+#pragma omp parallel for default(none) shared(t, data_raw, size) schedule(static)
 	// fills data array with pixel data, converts bytes to float by casting and
 	// dividing by 255
 	for (int i = 0; i < size; i++) {

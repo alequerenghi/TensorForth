@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <time.h>
+#include <omp.h>
 
 #include "stack.h"
 #include "tensor.h"
@@ -71,6 +72,16 @@ int verify_shape_tensor(tensor_t *shape, char *func_name)
 	}
 	return 0;
 }
+
+uint32_t xorshift32(uint32_t *state)
+{
+	uint32_t x = *state;
+	x ^= x << 23;
+	x ^= x >> 19;
+	x ^= x << 5;
+	return *state = x;
+}
+
 
 operation_t get_operation_from_char(char c)
 {
@@ -275,6 +286,7 @@ int fill_tensor(tf_stack_t *s)
 		perror("fill_tensor: memory allocation error");
 		return -4;
 	}
+#pragma omp parallel for default(none) shared(data, fill, data_size, fill_size) schedule(static)
 	for (int i = 0; i < data_size; i++) {
 		// fill with values, they can repeat
 		data[i] = fill->store->data[i % fill_size];
@@ -321,9 +333,16 @@ int fill_random(tf_stack_t *s)
 		perror("fill_random: memory allocation error");
 		return -3;
 	}
-	for (int i = 0; i < data_size; i++) {
-		// maybe use rand_r or something else for parallel filling
-		data[i] = (float)drand48();
+#pragma omp parallel default(none) shared(data, data_size)
+	{
+		int tid = omp_get_thread_num();
+		uint32_t seed = 230401 + (tid * 210773);
+#pragma omp for schedule(static)
+		for (int i = 0; i < data_size; i++) {
+			// maybe use rand_r or something else for parallel filling
+			uint32_t r = xorshift32(&seed);
+			data[i] = (float)r / 4294967295.0f;
+		}
 	}
 	tensor_t *t = build_empty_tensor(n, m);
 	if (NULL == t) {
@@ -471,6 +490,7 @@ int op_elem_by_elem(tf_stack_t *s, char *op_name, math_op func)
  */
 void add_floats(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = left[i] + right[i];
 	}
@@ -478,6 +498,7 @@ void add_floats(float *res, const float *left, const float *right, int size)
 
 void sub_floats(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = left[i] - right[i];
 	}
@@ -485,6 +506,7 @@ void sub_floats(float *res, const float *left, const float *right, int size)
 
 void mult_floats(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = left[i] * right[i];
 	}
@@ -492,6 +514,7 @@ void mult_floats(float *res, const float *left, const float *right, int size)
 
 void compare_lt(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = left[i] < right[i];
 	}
@@ -499,6 +522,7 @@ void compare_lt(float *res, const float *left, const float *right, int size)
 
 void compare_gt(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = left[i] > right[i];
 	}
@@ -506,6 +530,7 @@ void compare_gt(float *res, const float *left, const float *right, int size)
 
 void compare_eq(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = left[i] == right[i];
 	}
@@ -540,9 +565,10 @@ int op_ternary(tf_stack_t *s)
 		perror("op_ternary: memory allocation error");
 		return -3;
 	}
+#pragma omp parallel for default(none) shared(data, mask, right, left, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		int p = mask->store->data[i] == 1;
-		// insert element from right if mask[i] == 1.0, else from left
+		// insert element from left if mask[i] == 1.0, else from right
 		data[i] = p * right->store->data[i] + (1 - p) * left->store->data[i];
 	}
 	tensor_t *t = build_empty_tensor(left->shape[0], left->shape[1]);
@@ -563,6 +589,7 @@ int op_ternary(tf_stack_t *s)
 
 void compare_and(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = (float)(((int)left[i]) & ((int)right[i]));
 	}
@@ -570,6 +597,7 @@ void compare_and(float *res, const float *left, const float *right, int size)
 
 void compare_or(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = (float)(((int)left[i]) | ((int)right[i]));
 	}
@@ -594,6 +622,7 @@ int negate_floats(tf_stack_t *s)
 		return -2;
 	}
 	int size = t->shape[0] * t->shape[1];
+#pragma omp parallel for default(none) shared(target, t, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		// put the negation of each value in the result vector
 		target->store->data[i] = (float)(!t->store->data[i]);
@@ -623,6 +652,7 @@ int get_relu(tf_stack_t *s)
 		return -2;
 	}
 	int size = t->shape[0] * t->shape[1];
+#pragma omp parallel for default(none) shared(target, t, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		int p = (0 < t->store->data[i]);
 		target->store->data[i] = p * t->store->data[i];
@@ -637,6 +667,7 @@ int get_relu(tf_stack_t *s)
 
 void get_min(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = (left[i] + right[i] - fabsf(left[i] - right[i])) / 2;
 	}
@@ -644,6 +675,7 @@ void get_min(float *res, const float *left, const float *right, int size)
 
 void get_max(float *res, const float *left, const float *right, int size)
 {
+#pragma omp parallel for default(none) shared(res, left, right, size) schedule(static)
 	for (int i = 0; i < size; i++) {
 		res[i] = (left[i] + right[i] + fabsf(left[i] - right[i])) / 2;
 	}
@@ -668,7 +700,7 @@ int sum_tensor(tf_stack_t *s)
 	}
 	float total_sum = 0.0f;
 	int size = t->shape[0] * t->shape[1];
-	// #pragma omp parallel for reduction(+: total_sum)
+#pragma omp parallel for default(none) shared(t, size) schedule(static) reduction(+: total_sum)
 	for (int i = 0; i < size; i++) {
 		// sum all elements in the tensor
 		total_sum += t->store->data[i];
@@ -753,6 +785,7 @@ int dot(tf_stack_t *s)
 	}
 	float dot_sum = 0.0f;
 	int size = left->shape[1];
+#pragma omp parallel for default(none) shared(left, right, size) schedule(static) reduction(+: dot_sum)
 	for (int i = 0; i < size; i++) {
 		// perform scalar product
 		dot_sum += left->store->data[i] * right->store->data[i];
@@ -803,6 +836,7 @@ int convolute_tensors(tf_stack_t *s)
 	}
 	// number of padding layers
 	int offset = (k - 1) / 2;
+#pragma omp parallel for default(none) shared(target, left, kernel, offset, n, m, k) schedule(static) collapse(2)
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < m; j++) {
 			// simulate padding: p for rows and q for columns, start avoids memory
@@ -919,6 +953,7 @@ int write_pgm(FILE *fd, tensor_t *t)
 		perror("write_pgm: memory allocation failed");
 		return -2;
 	}
+#pragma omp parallel for default(none) shared(data, t, size) schedule(static)
 	for (int i = 0; i < size; i ++) {
 		// normalize data and copy it to data array
 		data[i] = (uint8_t)(((0 < t->store->data[i]) * t->store->data[i] - ((1 < t->store->data[i]) * (t->store->data[i] - 1))) * 255);

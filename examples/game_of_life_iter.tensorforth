@@ -1,0 +1,7 @@
+"examples/gol_next_state.pgm" (
+[ 1 1 1 1 0 1 1 1 1 ] [ 3 3 ] r o s c d
+d # [ 3 ] f = s 
+d # [ 2 ] f = | o & s
+[ 1 1 1 1 0 1 1 1 1 ] [ 3 3 ] r c
+d # [ 3 ] f = |
+"examples/gol_next_state.pgm" )
