@@ -11,8 +11,9 @@
 #include "tensor.h"
 
 /**
- * @file: tensor.c
+ * @file:		tensor.c
  * @author: ALESSANDRO QUERENGHI
+ * @id:			IN2300001
  *
  * This files contains the implementation of the header functions specified in
  * tensor.h

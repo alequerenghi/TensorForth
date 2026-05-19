@@ -1,5 +1,12 @@
 #include "matrix_multiply.h"
 
+/**
+ * @file:		 matrix_multiply.c
+ * @author: ALESSANDRO QUERENGHI
+ * @id			IN2300001
+ *
+ * This file contains the implementations of the functions specified in matrix_multiply.h
+ */
 void simple_multiply(float * A, float * B, float * C, int n, int m, int p)
 {
   for (int i = 0; i < n; i++) {

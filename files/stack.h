@@ -4,8 +4,9 @@
 #include "tensor.h"
 
 /**
- * @file: stack.h
+ * @file:		stack.h
  * @author: ALESSANDRO QUERENGHI
+ * @id:			IN2300001
  *
  * This file contains the structs and function headers to manage the stack for
  * the program TensorForth

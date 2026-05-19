@@ -5,8 +5,9 @@
 #include "tensor.h"
 
 /**
- * @file: stack.c
+ * @file:		stack.c
  * @author: ALESSANDRO QUERENGHI
+ * @id:			IN2300001
  *
  * This files contains the implementation of the functions defined in stack.h
  */
