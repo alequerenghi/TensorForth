@@ -3,7 +3,7 @@
 /**
  * @file:		 matrix_multiply.c
  * @author: ALESSANDRO QUERENGHI
- * @id			IN2300001
+ * @id:			IN2300001
  *
  * This file contains the implementations of the functions specified in matrix_multiply.h
  */
@@ -16,17 +16,6 @@ void simple_multiply(float * A, float * B, float * C, int n, int m, int p)
 				sum += A[i * p + k] * B[k * m + j];
       }
 			C[i * m + j] += sum;
-    }
-  }
-}
-
-void transposed_multiply(float * A, float * B, float * C, int n)
-{
-  for (int i = 0; i < n; i++) {
-    for (int j = 0; j < n; j++) {
-      for (int k = 0; k < n; k++) {
-	C[i * n + j] += A[i * n + k] * B[j * n + k];
-      }
     }
   }
 }

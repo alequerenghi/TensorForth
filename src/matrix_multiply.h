@@ -4,7 +4,7 @@
 /**
  * @file:		matrix_multiply.h
  * @author: ALESSANDRO QUERENGHI
- * @id			IN2300001
+ * @id:			IN2300001
  *
  * This file contains headers for utility functions regarding matrix
  * multiplication
@@ -21,8 +21,6 @@
  * @param[in] p Second dimension of A and first dimension of B
  */
 void simple_multiply(float * A, float * B, float * C, int n, int m, int p);
-
-void transposed_multiply(float * A, float * B, float * C, int n, int m, int p);
 
 /**
  * Blocked matrix multiplication to make better use of memory locality
