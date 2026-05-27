@@ -1,5 +1,16 @@
-CC				= gcc
-CFLAGS 		= -O3 -march=native -Wall -pedantic -std=gnu18 -fopenmp -g
+COMPILER ?= nvc
+
+ifeq ($(COMPILER), gcc)
+	CC				= gcc
+	CFLAGS		= -O3 -march=native -Wall -pedantic -std=gnu18 -fopenmp -g
+
+else ifeq ($(COMPILER), nvc)
+	CC				= nvc
+	CFLAGS		= -O3 -std=gnu18 -mp=gpu -gopt
+
+else
+	$(error Unknown COMPILER option '$(COMPILER)'. Please use COMPILER=nvc or COMPILER=gcc)
+endif
 
 SRC				= src
 LIB 			= lib

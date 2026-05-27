@@ -9,7 +9,7 @@
 #include "stack.h"
 #include "tensor.h"
 #include "operators.h"
-#include "matrix_multiply.c"
+#include "matrix_multiply.h"
 
 /**
  * @file:		operators.c
@@ -76,8 +76,8 @@ int verify_shape_tensor(tensor_t *shape, char *func_name)
 uint32_t xorshift32(uint32_t *state)
 {
 	uint32_t x = *state;
-	x ^= x << 23;
-	x ^= x >> 19;
+	x ^= x << 13;
+	x ^= x >> 17;
 	x ^= x << 5;
 	return *state = x;
 }
@@ -339,7 +339,6 @@ int fill_random(tf_stack_t *s)
 		uint32_t seed = 230401 + (tid * 210773);
 #pragma omp for schedule(static)
 		for (int i = 0; i < data_size; i++) {
-			// maybe use rand_r or something else for parallel filling
 			uint32_t r = xorshift32(&seed);
 			data[i] = (float)r / 4294967295.0f;
 		}
