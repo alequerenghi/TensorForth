@@ -56,7 +56,8 @@ int require_tensors(tf_stack_t *s, int count, char *func_name)
 int verify_shape_tensor(tensor_t *shape, char *func_name)
 {
 	if (1 != shape->shape[0] || 2 < shape->shape[1]) {
-		fprintf(stderr, "%s: shape tensors have shape either [ 1 1 ] or [ 1 2 ], this tensor: [%d %d]\n", func_name, shape->shape[0], shape->shape[1]);
+		fprintf(stderr, "%s: shape tensors have shape either [ 1 1 ] or [ 1 2 ],"
+				" this tensor: [%d %d]\n", func_name, shape->shape[0], shape->shape[1]);
 		return -1;
 	}
 	int size = shape->shape[0] * shape->shape[1];
@@ -286,7 +287,8 @@ int fill_tensor(tf_stack_t *s)
 		perror("fill_tensor: memory allocation error");
 		return -4;
 	}
-#pragma omp parallel for default(none) shared(data, fill, data_size, fill_size) schedule(static)
+#pragma omp parallel for default(none) \
+						shared(data, fill, data_size, fill_size) schedule(static)
 	for (int i = 0; i < data_size; i++) {
 		// fill with values, they can repeat
 		data[i] = fill->store->data[i % fill_size];
@@ -310,7 +312,8 @@ int fill_tensor(tf_stack_t *s)
 }
 
 /**
- * Pop a shape tensor from the stack and push a new tensor with shape s and content random values in the range [0, 1]
+ * Pop a shape tensor from the stack and push a new tensor with shape s and
+ * content random values in the range [0, 1]
  *
  * @param[in,out] s The pointer to the stack
  * @return 0 if the operation is successful or a negative integer otherwise
@@ -336,7 +339,7 @@ int fill_random(tf_stack_t *s)
 #pragma omp parallel default(none) shared(data, data_size)
 	{
 		int tid = omp_get_thread_num();
-		uint32_t seed = 230401 + (tid * 210773);
+		uint32_t seed = 123456789 + (tid * 98765);
 #pragma omp for schedule(static)
 		for (int i = 0; i < data_size; i++) {
 			uint32_t r = xorshift32(&seed);
@@ -458,7 +461,8 @@ int op_elem_by_elem(tf_stack_t *s, char *op_name, math_op func)
 	tensor_t *right = s->items[s->count - 2].as.t;
 	if (right->shape[0] != left->shape[0] ||
 			right->shape[1] != left->shape[1]) {
-		fprintf(stderr, "%s: incompatible shapes [%d, %d] != [%d, %d]\n", op_name, left->shape[0], left->shape[1], right->shape[0], right->shape[1]);
+		fprintf(stderr, "%s: incompatible shapes [%d, %d] != [%d, %d]\n", op_name,
+					  left->shape[0], left->shape[1], right->shape[0], right->shape[1]);
 		return -2;
 	}
 	// result tensor
@@ -835,7 +839,11 @@ int convolute_tensors(tf_stack_t *s)
 	}
 	// number of padding layers
 	int offset = (k - 1) / 2;
-#pragma omp parallel for default(none) shared(target, left, kernel, offset, n, m, k) schedule(static) collapse(2)
+#pragma omp target teams distribute parallel for default(none) \
+	shared(target, left, kernel, offset, n, m, k) schedule(static) collapse(2) \
+																														map(to:kernel) \
+																														map(to:left) \
+																														map(tofrom:target)
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < m; j++) {
 			// simulate padding: p for rows and q for columns, start avoids memory
@@ -955,7 +963,8 @@ int write_pgm(FILE *fd, tensor_t *t)
 #pragma omp parallel for default(none) shared(data, t, size) schedule(static)
 	for (int i = 0; i < size; i ++) {
 		// normalize data and copy it to data array
-		data[i] = (uint8_t)(((0 < t->store->data[i]) * t->store->data[i] - ((1 < t->store->data[i]) * (t->store->data[i] - 1))) * 255);
+		data[i] = (uint8_t)(((0 < t->store->data[i]) * t->store->data[i] - ((1 <
+							t->store->data[i]) * (t->store->data[i] - 1))) * 255);
 	}
 	// write data and make sure that everything is written to file
 	if (size != fwrite(data, 1, size, fd)) {

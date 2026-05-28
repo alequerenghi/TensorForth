@@ -1,3 +1,5 @@
+#include <omp.h>
+
 #include "matrix_multiply.h"
 
 /**
@@ -20,7 +22,10 @@ void simple_multiply(float * A, float * B, float * C, int n, int m, int p)
   }
 }
 
-void kernel(float * A, float * B, float * C, int x, int dx, int y, int dy, int z, int dz, int n, int m, int p)
+void kernel(float * A, float * B, float * C, int x, int dx,
+																						 int y, int dy,
+																						 int z, int dz,
+																						 int n, int m, int p)
 {
   int mx = (x + dx > n) ? n : x + dx;
   int my = (y + dy > m) ? m : y + dy;
@@ -43,6 +48,10 @@ void blocked_multiply(float * A, float * B, float * C, int n, int m, int p)
   const int s2 = 16;
   const int s3 = 16;
 
+#pragma omp target teams distribute parallel for collapse(2) \
+																						map(to:A[0:n*p]) \
+																						map(to:B[0:m*p]) \
+																						map(from:C[0:n*m])
   for (int i = 0; i < n; i += s1) {
     for (int j = 0; j < m; j += s2) {
       for (int k = 0; k < p; k += s3) {

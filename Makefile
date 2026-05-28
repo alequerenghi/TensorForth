@@ -1,4 +1,4 @@
-COMPILER ?= nvc
+COMPILER ?= gcc
 
 ifeq ($(COMPILER), gcc)
 	CC				= gcc
@@ -6,7 +6,7 @@ ifeq ($(COMPILER), gcc)
 
 else ifeq ($(COMPILER), nvc)
 	CC				= nvc
-	CFLAGS		= -O3 -std=gnu18 -mp=gpu -gopt
+	CFLAGS		= -O3 -std=gnu18 -mp=gpu -gpu=mem:managed -gopt
 
 else
 	$(error Unknown COMPILER option '$(COMPILER)'. Please use COMPILER=nvc or COMPILER=gcc)
