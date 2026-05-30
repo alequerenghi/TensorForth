@@ -19,11 +19,11 @@
  * Holds the data of a tensor
  */
 typedef struct storage {
-	int			ref_counter;
 	off_t		offset;
 	size_t	mmap_size;
-	bool		on_disk;
 	float		*data;
+	int			ref_counter;
+	bool		on_disk;
 } storage_t;
 
 /**

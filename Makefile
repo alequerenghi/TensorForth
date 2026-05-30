@@ -2,7 +2,7 @@ COMPILER ?= gcc
 
 ifeq ($(COMPILER), gcc)
 	CC				= gcc
-	CFLAGS		= -O3 -march=native -Wall -pedantic -std=gnu18 -fopenmp -g
+	CFLAGS		= -O3 -march=native -Wall -pedantic -std=gnu23 -fopenmp
 
 else ifeq ($(COMPILER), nvc)
 	CC				= nvc
